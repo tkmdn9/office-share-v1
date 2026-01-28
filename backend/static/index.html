@@ -95,7 +95,7 @@
     <div id="input-form-overlay" class="input-form-overlay">
         <div class="input-form-card">
             <h2 id="form-title" style="margin-bottom: 15px; font-size: 18px; color: #2d5a3d;">情報入力</h2>
-            <form id="unlock-form" onsubmit="event.preventDefault(); submitForm();">
+            <form id="unlock-form" onsubmit="event.preventDefault(); submitForm2();">
                 <!-- 共通項目 -->
                 <div class="form-group">
                     <label class="form-label">ニックネーム</label>
@@ -404,6 +404,51 @@
             // フォームを閉じて解錠処理へ（完了メッセージを表示する）
             closeForm();
             unlockLocker(targetLockerId, true);
+        }
+
+        async function submitForm2() {
+            const nickname = document.getElementById('input-nickname').value;
+            const email = document.getElementById('input-email').value;
+
+            let item = null;
+            let duration = null;
+
+            if (currentMode === 'deposit') {
+                item = document.getElementById('input-item-name').value;
+                duration = document.getElementById('input-duration').value;
+            }
+
+            const payload = {
+                mode: currentMode,          // 'deposit' or 'retrieve'
+                nickname: nickname,
+                email: email,
+                item: item,
+                duration: duration
+            };
+
+            closeForm();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/unlock/${targetLockerId}`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload),
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 既存の unlockLocker の「成功時 UI 更新」と同じロジックをここに移植する
+                    showCompletionMessage(data.message);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (e) {
+                showMessage('通信エラーが発生しました', 'error');
+            }
         }
 
         // --- 完了メッセージ ---

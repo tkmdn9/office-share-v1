@@ -7,10 +7,27 @@ import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles  # 追加
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+from gpiozero import OutputDevice
+from time import sleep
 import os
+
+# ロック用リレーをつないだGPIOピン
+LOCK_GPIO_PIN_1 = 22
+LOCK_GPIO_PIN_2 = 27
+LOCK_GPIO_PIN_3 = 17
+
+lock1 = OutputDevice(pin=LOCK_GPIO_PIN_1, active_high=True, initial_value=False)
+lock2 = OutputDevice(pin=LOCK_GPIO_PIN_2, active_high=True, initial_value=False)
+lock3 = OutputDevice(pin=LOCK_GPIO_PIN_3, active_high=True, initial_value=False)
+
+LOCK_RELAY_MAP = {
+    1: lock1,
+    2: lock2,
+    3: lock3,
+}
 
 # --- GPIO設定 ---
 # 本番環境ではRPi.GPIOを使用、開発環境ではモック
@@ -24,9 +41,9 @@ except ImportError:
 
 # --- ロッカー設定 ---
 LOCKERS = {
-    1: {"name": "上段", "gpio": 14},
+    1: {"name": "上段", "gpio": 22},
     2: {"name": "中段", "gpio": 27},
-    3: {"name": "下段", "gpio": 22},
+    3: {"name": "下段", "gpio": 17},
 }
 
 UNLOCK_DURATION = 2  # 解錠時間（秒）
@@ -75,12 +92,21 @@ app.add_middleware(
 )
 
 
-# --- レスポンスモデル ---
+# --- Request Model ---
+class UnlockRequest(BaseModel):
+    mode: str                 # 'deposit' or 'retrieve'
+    nickname: str | None = None
+    email: str | None = None
+    item: str | None = None   # deposit のとき
+    duration: int | None = None
+
+# --- Reponse Model ---
 class UnlockResponse(BaseModel):
     success: bool
     locker_id: Optional[int] = None
     message: str
     unlock_duration: Optional[int] = None
+
 
 
 class LockerInfo(BaseModel):
@@ -171,7 +197,6 @@ async def get_locker(locker_id: int):
         status=locker_status[locker_id]
     )
 
-
 @app.get("/api/unlock/{locker_id}", response_model=UnlockResponse)
 async def unlock_locker(locker_id: int):
     """
@@ -204,6 +229,11 @@ async def unlock_locker(locker_id: int):
     try:
         # GPIO HIGH → 解錠
         if GPIO_AVAILABLE:
+            relay = LOCK_RELAY_MAP[locker_id]   # locker_id に応じて lock1/2/3 を取得
+            relay.on()
+            print(relay)
+            sleep(2.0)
+            relay.off()
             GPIO.output(gpio_pin, GPIO.HIGH)
         
         locker_status[locker_id] = "unlocked"
@@ -219,6 +249,58 @@ async def unlock_locker(locker_id: int):
             unlock_duration=UNLOCK_DURATION
         )
         
+    except Exception as e:
+        return UnlockResponse(
+            success=False,
+            locker_id=locker_id,
+            message=f"Error: {str(e)}"
+        )
+
+@app.post("/api/unlock/{locker_id}", response_model=UnlockResponse)
+async def unlock_locker(locker_id: int, body: UnlockRequest):
+    # ここで body.mode / body.nickname / body.email / body.item / body.duration が使える
+    # 例: ログ保存・DB保存など
+    print(f"[{body.mode}] locker={locker_id}, user={body.nickname} <{body.email}>")
+    if body.mode == "deposit":
+        print(f"item={body.item}, duration={body.duration}h")
+
+    # あとは今までの解錠ロジックをそのまま
+    if locker_id not in LOCKERS:
+        return UnlockResponse(
+            success=False,
+            message=f"Invalid locker ID. Valid IDs: {list(LOCKERS.keys())}"
+        )
+
+    config = LOCKERS[locker_id]
+    gpio_pin = config["gpio"]
+    locker_name = config["name"]
+
+    if locker_status[locker_id] == "unlocked":
+        return UnlockResponse(
+            success=True,
+            locker_id=locker_id,
+            message=f"引き出し{locker_id}（{locker_name}）は既に解錠中です",
+            unlock_duration=UNLOCK_DURATION
+        )
+
+    try:
+        if GPIO_AVAILABLE:
+            relay = LOCK_RELAY_MAP[locker_id]
+            relay.on()
+            sleep(2.0)
+            relay.off()
+            # GPIO.output(gpio_pin, GPIO.HIGH)
+
+        locker_status[locker_id] = "unlocked"
+        asyncio.create_task(auto_lock(locker_id))
+
+        return UnlockResponse(
+            success=True,
+            locker_id=locker_id,
+            message=f"引き出し{locker_id}（{locker_name}）を解錠しました",
+            unlock_duration=UNLOCK_DURATION
+        )
+
     except Exception as e:
         return UnlockResponse(
             success=False,
