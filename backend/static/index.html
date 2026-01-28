@@ -410,6 +410,9 @@
             const nickname = document.getElementById('input-nickname').value;
             const email = document.getElementById('input-email').value;
 
+            // closeFormでnullにされる前にIDを確保しておく
+            const id = targetLockerId;
+
             let item = null;
             let duration = null;
 
@@ -429,7 +432,7 @@
             closeForm();
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/unlock/${targetLockerId}`, {
+                const response = await fetch(`${API_BASE_URL}/api/unlock/${id}`, {
                     method: 'POST',
                     mode: 'cors',
                     headers: {
@@ -441,12 +444,28 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // 既存の unlockLocker の「成功時 UI 更新」と同じロジックをここに移植する
+                    // UI更新（unlockLockerと同じロジック）
+                    const btn = document.getElementById(`locker-${id}`);
+                    const statusIcon = btn.querySelector('.locker-status');
+
+                    btn.classList.add('success');
+                    statusIcon.textContent = '🔓';
+                    showMessage(`${data.message}（${data.unlock_duration}秒後に自動施錠）`, 'success');
+
+                    // 自動施錠後にUIを戻す
+                    setTimeout(() => {
+                        btn.classList.remove('success');
+                        statusIcon.textContent = '🔒';
+                        btn.disabled = false;
+                    }, data.unlock_duration * 1000);
+
+                    // 完了メッセージ
                     showCompletionMessage(data.message);
                 } else {
                     showMessage(data.message, 'error');
                 }
             } catch (e) {
+                console.error(e);
                 showMessage('通信エラーが発生しました', 'error');
             }
         }
