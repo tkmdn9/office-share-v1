@@ -1,0 +1,14 @@
+# FastAPI＋uvicorn稼働環境
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# 仮想環境を終了
+deactivate
+
+# 仮想環境のディレクトリごと削除
+rm -rf .venv
+
+# 外部公開用のURL
+ngrok http 8000

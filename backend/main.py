@@ -24,7 +24,7 @@ except ImportError:
 
 # --- ロッカー設定 ---
 LOCKERS = {
-    1: {"name": "上段", "gpio": 17},
+    1: {"name": "上段", "gpio": 14},
     2: {"name": "中段", "gpio": 27},
     3: {"name": "下段", "gpio": 22},
 }
