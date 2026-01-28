@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>🥬 オフィシェア</title>
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🥬 オフィシェア</h1>
+            <p>採れすぎた野菜をみんなでシェア！</p>
+        </header>
+
+        <!-- 接続ステータス -->
+        <div id="connection-status" class="connection-status disconnected"
+            style="justify-content: center; margin-bottom: 20px;">
+            <span class="status-dot disconnected"></span>
+            <span>未接続</span>
+        </div>
+
+        <!-- メッセージ表示エリア -->
+        <div id="message" class="message"></div>
+
+        <!-- 利用モード選択 -->
+        <div class="mode-selection" style="margin-bottom: 20px;">
+            <div class="mode-card" onclick="selectMode('deposit')" id="mode-deposit">
+                <span class="mode-icon">🥦</span>
+                <span>野菜を入れる</span>
+            </div>
+            <div class="mode-card" onclick="selectMode('retrieve')" id="mode-retrieve">
+                <span class="mode-icon">🍲</span>
+                <span>野菜を取り出す</span>
+            </div>
+        </div>
+
+        <!-- QRコードスキャン -->
+        <div class="qr-section">
+            <h2>📷 QRコードで開ける</h2>
+            <div id="qr-reader"></div>
+            <button class="scan-btn" id="scan-btn" onclick="toggleScanner()">
+                <span>📷</span>
+                <span id="scan-btn-text">カメラを起動</span>
+            </button>
+        </div>
+
+        <!-- ロッカー操作 -->
+        <div class="status-card">
+            <h2>📦 ロッカーを開ける</h2>
+            <div class="locker-grid">
+                <button class="locker-btn" onclick="unlockLocker(1)" id="locker-1">
+                    <div class="locker-info">
+                        <span class="locker-icon">🥕</span>
+                        <div class="locker-name">
+                            <span>引き出し 1</span>
+                            <span>上段</span>
+                        </div>
+                    </div>
+                    <span class="locker-status">🔒</span>
+                </button>
+
+                <button class="locker-btn" onclick="unlockLocker(2)" id="locker-2">
+                    <div class="locker-info">
+                        <span class="locker-icon">🥬</span>
+                        <div class="locker-name">
+                            <span>引き出し 2</span>
+                            <span>中段</span>
+                        </div>
+                    </div>
+                    <span class="locker-status">🔒</span>
+                </button>
+
+                <button class="locker-btn" onclick="unlockLocker(3)" id="locker-3">
+                    <div class="locker-info">
+                        <span class="locker-icon">🍅</span>
+                        <div class="locker-name">
+                            <span>引き出し 3</span>
+                            <span>下段</span>
+                        </div>
+                    </div>
+                    <span class="locker-status">🔒</span>
+                </button>
+            </div>
+        </div>
+
+
+    </div>
+
+    <!-- 入力フォームモーダル -->
+    <div id="input-form-overlay" class="input-form-overlay">
+        <div class="input-form-card">
+            <h2 id="form-title" style="margin-bottom: 15px; font-size: 18px; color: #2d5a3d;">情報入力</h2>
+            <form id="unlock-form" onsubmit="event.preventDefault(); submitForm();">
+                <!-- 共通項目 -->
+                <div class="form-group">
+                    <label class="form-label">ニックネーム</label>
+                    <input type="text" id="input-nickname" class="form-input" placeholder="例: やさい太郎">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">メールアドレス</label>
+                    <input type="email" id="input-email" class="form-input" placeholder="example@email.com">
+                </div>
+
+                <!-- 入れるモード専用項目 -->
+                <div id="deposit-fields" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">何を入れますか？</label>
+                        <input type="text" id="input-item-name" class="form-input" placeholder="例: キャベツ 2個">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">保管期間</label>
+                        <select id="input-duration" class="form-select">
+                            <option value="1">1時間</option>
+                            <option value="3">3時間</option>
+                            <option value="6">6時間</option>
+                            <option value="8">8時間</option>
+                            <option value="12">12時間</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel" onclick="closeForm()">キャンセル</button>
+                    <button type="submit" class="btn-submit">解錠する</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 完了メッセージモーダル -->
+    <div id="completion-overlay" class="input-form-overlay">
+        <div class="input-form-card" style="text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
+            <h2 style="margin-bottom: 15px; font-size: 20px; color: #2d5a3d;">作業が完了しました</h2>
+            <p id="completion-detail-message" style="font-weight: bold; color: #2d5a3d; margin-bottom: 10px;"></p>
+            <p style="margin-bottom: 24px; color: #555; line-height: 1.6;">
+                作業が終わったら扉を閉めて<br>
+                施錠されたことを確認して下さい。
+            </p>
+            <button class="btn-submit" onclick="closeCompletion()" style="width: 100%;">OK</button>
+        </div>
+    </div>
+
+    <!-- QRコードスキャナーライブラリ -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <script>
+        // --- 設定 ---
+        let API_BASE_URL = '';
+        let html5QrCode = null;
+        let isScanning = false;
+        let currentMode = null; // 'deposit' or 'retrieve'
+        let targetLockerId = null;
+
+        // --- 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // URLパラメータからロッカーIDを取得（QRコード経由）
+            const params = new URLSearchParams(window.location.search);
+            const lockerId = params.get('locker');
+
+            // 接続確認
+            checkConnection();
+
+            // QRコードからアクセスした場合は自動で解錠
+            if (lockerId) {
+                setTimeout(() => {
+                    unlockLocker(parseInt(lockerId));
+                }, 500);
+            }
+        });
+
+        // --- サーバー設定 ---
+
+
+        async function checkConnection() {
+            const statusEl = document.getElementById('connection-status');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/lockers`, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+
+                if (response.ok) {
+                    statusEl.className = 'connection-status connected';
+                    statusEl.innerHTML = `
+                        <span class="status-dot connected"></span>
+                        <span>接続中</span>
+                    `;
+                    // ロッカー状態を更新
+                    updateLockerStatus(await response.json());
+                } else {
+                    throw new Error('Connection failed');
+                }
+            } catch (e) {
+                statusEl.className = 'connection-status disconnected';
+                statusEl.innerHTML = `
+                    <span class="status-dot disconnected"></span>
+                    <span>接続エラー</span>
+                `;
+            }
+        }
+
+        function updateLockerStatus(data) {
+            data.lockers.forEach(locker => {
+                const btn = document.getElementById(`locker-${locker.id}`);
+                const statusIcon = btn.querySelector('.locker-status');
+                statusIcon.textContent = locker.status === 'locked' ? '🔒' : '🔓';
+            });
+        }
+
+        // --- ロッカー解錠 ---
+        async function unlockLocker(lockerId, showCompletion = false) {
+
+
+            const btn = document.getElementById(`locker-${lockerId}`);
+            const statusIcon = btn.querySelector('.locker-status');
+
+            // UIを「解錠中」状態に
+            btn.classList.add('unlocking');
+            btn.disabled = true;
+            statusIcon.textContent = '⏳';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/unlock/${lockerId}`, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // 成功
+                    btn.classList.remove('unlocking');
+                    btn.classList.add('success');
+                    statusIcon.textContent = '🔓';
+                    showMessage(`${data.message}（${data.unlock_duration}秒後に自動施錠）`, 'success');
+
+                    // 自動施錠後にUIを戻す
+                    setTimeout(() => {
+                        btn.classList.remove('success');
+                        statusIcon.textContent = '🔒';
+                        btn.disabled = false;
+                    }, data.unlock_duration * 1000);
+
+                    // 完了メッセージを表示（フラグがtrueの場合のみ）
+                    if (showCompletion) {
+                        setTimeout(() => {
+                            showCompletionMessage(data.message);
+                        }, 500);
+                    }
+
+                } else {
+                    // エラー
+                    btn.classList.remove('unlocking');
+                    btn.classList.add('error');
+                    statusIcon.textContent = '❌';
+                    showMessage(data.message, 'error');
+
+                    setTimeout(() => {
+                        btn.classList.remove('error');
+                        statusIcon.textContent = '🔒';
+                        btn.disabled = false;
+                    }, 2000);
+                }
+
+            } catch (e) {
+                btn.classList.remove('unlocking');
+                btn.classList.add('error');
+                statusIcon.textContent = '❌';
+                showMessage('通信エラーが発生しました', 'error');
+
+                setTimeout(() => {
+                    btn.classList.remove('error');
+                    statusIcon.textContent = '🔒';
+                    btn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        // --- 利用モード選択 ---
+        function selectMode(mode) {
+            currentMode = mode;
+
+            // UI更新
+            document.querySelectorAll('.mode-card').forEach(card => card.classList.remove('selected'));
+            document.getElementById(`mode-${mode}`).classList.add('selected');
+
+            // メッセージクリア
+            const messageEl = document.getElementById('message');
+            if (messageEl.classList.contains('error')) {
+                messageEl.classList.remove('show');
+            }
+        }
+
+        // --- QRコードスキャナー ---
+        function toggleScanner() {
+            if (!currentMode) {
+                showMessage('利用方法（入れる/取り出す）を選択してください', 'error');
+                // エラーを目立たせるためにモード選択エリアを揺らすなどの演出も可能ですが、まずはメッセージのみ
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+
+            if (isScanning) {
+                stopScanner();
+            } else {
+                startScanner();
+            }
+        }
+
+        function startScanner() {
+            const qrReader = document.getElementById('qr-reader');
+            const scanBtn = document.getElementById('scan-btn');
+            const scanBtnText = document.getElementById('scan-btn-text');
+
+            html5QrCode = new Html5Qrcode("qr-reader");
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                (decodedText) => {
+                    // QRコード読み取り成功
+                    handleQrCode(decodedText);
+                },
+                (errorMessage) => {
+                    // エラーは無視（スキャン中は常にエラーが発生する）
+                }
+            ).then(() => {
+                isScanning = true;
+                scanBtnText.textContent = 'カメラを停止';
+                scanBtn.style.background = '#dc3545';
+            }).catch(err => {
+                showMessage('カメラを起動できませんでした', 'error');
+                console.error(err);
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    isScanning = false;
+                    document.getElementById('scan-btn-text').textContent = 'カメラを起動';
+                    document.getElementById('scan-btn').style.background = '#2d5a3d';
+                    document.getElementById('qr-reader').innerHTML = '';
+                });
+            }
+        }
+
+        // --- 入力フォーム ---
+        function showInputForm(lockerId) {
+            targetLockerId = lockerId;
+            const overlay = document.getElementById('input-form-overlay');
+            const title = document.getElementById('form-title');
+            const depositFields = document.getElementById('deposit-fields');
+            const itemNameInput = document.getElementById('input-item-name');
+
+            // タイトル更新
+            const lockerName = document.querySelector(`#locker-${lockerId} .locker-name span:first-child`).textContent;
+            title.textContent = `${lockerName} - 情報入力`;
+
+            // モード別表示切替
+            if (currentMode === 'deposit') {
+                depositFields.style.display = 'block';
+                itemNameInput.required = true;
+            } else {
+                depositFields.style.display = 'none';
+                itemNameInput.required = false;
+            }
+
+            overlay.classList.add('visible');
+        }
+
+        function closeForm() {
+            document.getElementById('input-form-overlay').classList.remove('visible');
+            document.getElementById('unlock-form').reset();
+            targetLockerId = null;
+        }
+
+        function submitForm() {
+            // ここでバリデーションはHTML5のrequired属性で自動的に行われますが、追加チェックも可能
+
+            // フォーム値の取得（今回はコンソール表示のみ）
+            const nickname = document.getElementById('input-nickname').value;
+            const email = document.getElementById('input-email').value;
+
+            console.log(`[${currentMode.toUpperCase()}] Locker: ${targetLockerId}`);
+            console.log(`User: ${nickname} (${email})`);
+
+            if (currentMode === 'deposit') {
+                const item = document.getElementById('input-item-name').value;
+                const duration = document.getElementById('input-duration').value;
+                console.log(`Deposit Item: ${item}, Duration: ${duration}h`);
+            }
+
+            // フォームを閉じて解錠処理へ（完了メッセージを表示する）
+            closeForm();
+            unlockLocker(targetLockerId, true);
+        }
+
+        // --- 完了メッセージ ---
+        function showCompletionMessage(message) {
+            if (message) {
+                document.getElementById('completion-detail-message').textContent = message;
+            }
+            document.getElementById('completion-overlay').classList.add('visible');
+        }
+
+        function closeCompletion() {
+            document.getElementById('completion-overlay').classList.remove('visible');
+            // 必要ならここでトップに戻るなどの処理
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function handleQrCode(decodedText) {
+            // QRコードからロッカーIDを抽出
+            try {
+                const url = new URL(decodedText);
+                const lockerId = url.searchParams.get('locker');
+
+                if (lockerId) {
+                    stopScanner();
+                    showMessage(`QRコード読み取り: 引き出し ${lockerId}`, 'info');
+                    // 直接解錠せずに入力フォームを表示
+                    showInputForm(parseInt(lockerId));
+                } else {
+                    showMessage('無効なQRコードです', 'error');
+                }
+            } catch (e) {
+                // URLでない場合、直接数字をチェック
+                const lockerId = parseInt(decodedText);
+                if (lockerId >= 1 && lockerId <= 3) {
+                    stopScanner();
+                    showMessage(`QRコード読み取り: 引き出し ${lockerId}`, 'info');
+                    // 直接解錠せずに入力フォームを表示
+                    showInputForm(lockerId);
+                } else {
+                    showMessage('無効なQRコードです', 'error');
+                }
+            }
+        }
+
+        // --- メッセージ表示 ---
+        function showMessage(text, type) {
+            const messageEl = document.getElementById('message');
+            messageEl.textContent = text;
+            messageEl.className = `message ${type} show`;
+
+            setTimeout(() => {
+                messageEl.classList.remove('show');
+            }, 4000);
+        }
+    </script>
+</body>
+
+</html>

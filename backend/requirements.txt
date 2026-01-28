@@ -1,0 +1,13 @@
+# 野菜シェアロッカー - バックエンド依存関係
+# Raspberry Pi 4 で実行
+
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+
+# GPIO制御（Raspberry Pi専用）
+# RPi.GPIO==0.7.1
+
+# 開発環境（PC）では以下でモック実行可能
+# pip install -r requirements.txt
+# GPIOがなくても動作します（モックモード）
