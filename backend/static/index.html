@@ -169,7 +169,7 @@
             // QRコードからアクセスした場合は自動で解錠
             if (lockerId) {
                 setTimeout(() => {
-                    unlockLocker(parseInt(lockerId));
+                    showInputForm(parseInt(lockerId));
                 }, 500);
             }
         });
