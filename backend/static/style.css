@@ -397,3 +397,32 @@ footer {
     font-weight: 600;
     cursor: pointer;
 }
+
+/* メッセージボタン */
+.messages-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: white;
+    color: #2d5a3d;
+    text-decoration: none;
+    font-size: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.messages-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.messages-btn:active {
+    transform: scale(0.95);
+}
+

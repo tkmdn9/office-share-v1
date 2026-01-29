@@ -12,9 +12,12 @@
 
 <body>
     <div class="container">
-        <header>
+        <header style="position: relative;">
             <h1>🥬 オフィシェア</h1>
-            <p>採れすぎた野菜をみんなでシェア！</p>
+            <p>採れすぎた野菜をみんなでシェア!</p>
+            <a href="/static/messages.html" class="messages-btn">
+                💬
+            </a>
         </header>
 
         <!-- 接続ステータス -->
@@ -51,7 +54,7 @@
 
         <!-- ロッカー操作 -->
         <div class="status-card" style="display: none;">
-        <!-- <div class="status-card"> -->
+            <!-- <div class="status-card"> -->
             <h2>📦 ロッカーを開ける</h2>
             <div class="locker-grid">
                 <button class="locker-btn" onclick="unlockLocker(1)" id="locker-1">
