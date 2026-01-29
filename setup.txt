@@ -12,3 +12,13 @@ rm -rf .venv
 
 # 外部公開用のURL
 ngrok http 8000
+
+# QRコード生成(GET用)
+qrencode -o locker1.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/?locker=1"
+qrencode -o locker2.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/?locker=2"
+qrencode -o locker3.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/?locker=3"
+
+# QRコード生成(POST用)
+qrencode -o locker1_POST.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/api/unlock/1"
+qrencode -o locker2_POST.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/api/unlock/2"
+qrencode -o locker3_POST.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/api/unlock/3"
