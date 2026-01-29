@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
-# from gpiozero import OutputDevice
+from gpiozero import OutputDevice
 from time import sleep
 import os
 
