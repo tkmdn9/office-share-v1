@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
-from gpiozero import OutputDevice
+# from gpiozero import OutputDevice
 from time import sleep
 import os
 
@@ -19,16 +19,16 @@ LOCK_GPIO_PIN_1 = 22
 LOCK_GPIO_PIN_2 = 27
 LOCK_GPIO_PIN_3 = 17
 
-# GPIOピンへの通電の関数
-lock1 = OutputDevice(pin=LOCK_GPIO_PIN_1, active_high=True, initial_value=False)
-lock2 = OutputDevice(pin=LOCK_GPIO_PIN_2, active_high=True, initial_value=False)
-lock3 = OutputDevice(pin=LOCK_GPIO_PIN_3, active_high=True, initial_value=False)
+# # GPIOピンへの通電の関数
+# lock1 = OutputDevice(pin=LOCK_GPIO_PIN_1, active_high=True, initial_value=False)
+# lock2 = OutputDevice(pin=LOCK_GPIO_PIN_2, active_high=True, initial_value=False)
+# lock3 = OutputDevice(pin=LOCK_GPIO_PIN_3, active_high=True, initial_value=False)
 
-LOCK_RELAY_MAP = {
-    1: lock1,
-    2: lock2,
-    3: lock3,
-}
+# LOCK_RELAY_MAP = {
+#     1: lock1,
+#     2: lock2,
+#     3: lock3,
+# }
 
 # --- GPIO設定 ---
 # 本番環境ではRPi.GPIOを使用、開発環境ではモック
