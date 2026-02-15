@@ -1,215 +1,395 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>💬 メッセージ一覧 - オフィシェア</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        /* メッセージ一覧専用スタイル */
-        .messages-header {
-            position: relative;
-            text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .back-btn {
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            background: white;
-            border: none;
-            padding: 10px 16px;
-            border-radius: 12px;
-            font-size: 18px;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .back-btn:hover {
-            transform: translateY(-50%) scale(1.05);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .messages-list {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .message-card {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .message-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-        }
-
-        .message-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #f0f7f4;
-        }
-
-        .message-id {
-            font-size: 14px;
-            font-weight: 600;
-            color: #2d5a3d;
-            background: #f0f7f4;
-            padding: 4px 12px;
-            border-radius: 8px;
-        }
-
-        .message-nickname {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2d5a3d;
-        }
-
-        .message-comment {
-            font-size: 15px;
-            line-height: 1.6;
-            color: #333;
-            margin-bottom: 16px;
-        }
-
-        .message-photo {
-            width: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .message-photo img {
-            width: 100%;
-            height: auto;
-            display: block;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #888;
-        }
-
-        .empty-state-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state-text {
-            font-size: 16px;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>メッセージ - オフィシェア</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-
 <body>
-    <div class="container">
-        <div class="messages-header">
-            <button class="back-btn" onclick="goBack()">←</button>
-            <h1>💬 メッセージ一覧</h1>
+    <div class="messages-container">
+        <a href="/" class="back-button">← ホームに戻る</a>
+
+        <!-- 取引一覧（transaction_idがない場合に表示） -->
+        <div id="transactions-view" style="display: none;">
+            <div class="transactions-list">
+                <h2>📦 取引一覧</h2>
+                <table class="transactions-table" id="transactions-container">
+                    <thead>
+                        <tr>
+                            <th>種別</th>
+                            <th>ユーザー</th>
+                            <th>野菜・内容</th>
+                            <th>ロッカー</th>
+                            <th>日時</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactions-tbody">
+                        <tr>
+                            <td colspan="5" class="loading">取引を読み込み中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="messages-list" id="messages-list">
-            <!-- メッセージカード1 -->
-            <div class="message-card">
-                <div class="message-header">
-                    <span class="message-id">#001</span>
-                    <span class="message-nickname">やさい太郎</span>
-                </div>
-                <p class="message-comment">
-                    いただいたナスで麻婆茄子を作りました！🍆<br>
-                    とろとろで美味しかったです。ごちそうさまでした！
-                </p>
-                <div class="message-photo">
-                    <img src="https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=600&h=400&fit=crop"
-                        alt="麻婆茄子">
-                </div>
+        <!-- メッセージ画面（transaction_idがある場合に表示） -->
+        <div id="messages-view" style="display: none;">
+            <div id="transaction-info" class="transaction-info" style="display: none;">
+                <!-- JavaScriptで動的に生成 -->
             </div>
 
-            <!-- メッセージカード2 -->
-            <div class="message-card">
-                <div class="message-header">
-                    <span class="message-id">#002</span>
-                    <span class="message-nickname">野菜花子</span>
-                </div>
-                <p class="message-comment">
-                    トマトでカプレーゼを作りました🍅<br>
-                    新鮮なトマトは甘くて最高でした！ありがとうございます😊
-                </p>
-                <div class="message-photo">
-                    <img src="https://images.unsplash.com/photo-1608897013039-887f21d8c804?w=600&h=400&fit=crop"
-                        alt="カプレーゼ">
-                </div>
+            <div id="messages-list" class="messages-list">
+                <div class="loading">メッセージを読み込み中...</div>
             </div>
 
-            <!-- メッセージカード3 -->
-            <div class="message-card">
-                <div class="message-header">
-                    <span class="message-id">#003</span>
-                    <span class="message-nickname">料理好き太郎</span>
-                </div>
-                <p class="message-comment">
-                    キャベツでロールキャベツを作りました🥬<br>
-                    柔らかくて甘みがあって、家族にも大好評でした！
-                </p>
-                <div class="message-photo">
-                    <img src="https://images.unsplash.com/photo-1544025162-d76694265947?w=600&h=400&fit=crop"
-                        alt="ロールキャベツ">
-                </div>
-            </div>
-
-            <!-- メッセージカード4 -->
-            <div class="message-card">
-                <div class="message-header">
-                    <span class="message-id">#004</span>
-                    <span class="message-nickname">健康志向さん</span>
-                </div>
-                <p class="message-comment">
-                    いただいた野菜でラタトゥイユを作りました🍆🍅<br>
-                    野菜の旨味がたっぷりで、ヘルシーで美味しかったです！
-                </p>
-                <div class="message-photo">
-                    <img src="https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=600&h=400&fit=crop"
-                        alt="ラタトゥイユ">
-                </div>
-            </div>
-
-            <!-- メッセージカード5 -->
-            <div class="message-card">
-                <div class="message-header">
-                    <span class="message-id">#005</span>
-                    <span class="message-nickname">ベジタリアン</span>
-                </div>
-                <p class="message-comment">
-                    ピーマンと人参で野菜炒めを作りました🫑🥕<br>
-                    シャキシャキで美味しかったです。また楽しみにしています！
-                </p>
-                <div class="message-photo">
-                    <img src="https://images.unsplash.com/photo-1512058564366-18510be2db19?w=600&h=400&fit=crop"
-                        alt="野菜炒め">
-                </div>
+            <div class="message-form">
+                <h3>💬 メッセージを送信</h3>
+                <div id="form-message" style="display: none;"></div>
+                
+                <input 
+                    type="email" 
+                    id="user-email" 
+                    class="user-email-input" 
+                    placeholder="あなたのメールアドレス"
+                    required
+                >
+                
+                <textarea 
+                    id="message-content" 
+                    class="message-input" 
+                    placeholder="メッセージを入力してください..."
+                    required
+                ></textarea>
+                
+                <button id="send-button" class="send-button" onclick="sendMessage()">
+                    送信する
+                </button>
             </div>
         </div>
     </div>
 
     <script>
-        function goBack() {
-            window.location.href = '/';
+        // URLパラメータから取引IDを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const transactionId = urlParams.get('transaction_id');
+
+        // ローカルストレージからメールアドレスを復元
+        const savedEmail = localStorage.getItem('userEmail');
+        if (savedEmail) {
+            document.getElementById('user-email').value = savedEmail;
         }
+
+        // 初期化
+        if (!transactionId) {
+            // 取引一覧を表示
+            showTransactionsList();
+        } else {
+            // メッセージ画面を表示
+            showMessagesView();
+            loadTransactionAndMessages();
+        }
+
+        /**
+         * 取引一覧表示モード
+         */
+        function showTransactionsList() {
+            document.getElementById('transactions-view').style.display = 'block';
+            document.getElementById('messages-view').style.display = 'none';
+            loadTransactions();
+        }
+
+        /**
+         * メッセージ表示モード
+         */
+        function showMessagesView() {
+            document.getElementById('transactions-view').style.display = 'none';
+            document.getElementById('messages-view').style.display = 'block';
+        }
+
+        /**
+         * 取引一覧を読み込む
+         */
+        async function loadTransactions() {
+            try {
+                const response = await fetch('/api/transactions?limit=20');
+                const data = await response.json();
+
+                if (data.success && data.transactions.length > 0) {
+                    displayTransactions(data.transactions);
+                } else {
+                    document.getElementById('transactions-container').innerHTML = 
+                        '<div class="no-transactions">まだ取引がありません</div>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('transactions-container').innerHTML = 
+                    '<div class="error-message">取引の読み込みに失敗しました</div>';
+            }
+        }
+
+        /**
+         * 取引一覧を表示
+         */
+        function displayTransactions(transactions) {
+            const tbody = document.getElementById('transactions-tbody');
+            
+            let html = '';
+            transactions.forEach(t => {
+                const modeEmoji = t.mode === 'deposit' ? '🥦' : '🍲';
+                const modeText = t.mode === 'deposit' ? '預け入れ' : '取り出し';
+                const modeClass = t.mode === 'deposit' ? 'deposit' : 'retrieve';
+                const contentText = t.item || '-';
+                const contentClass = t.item ? '' : 'empty';
+                
+                html += `
+                    <tr class="transaction-row ${modeClass}" onclick="selectTransaction(${t.id})">
+                        <td class="transaction-type-cell">
+                            <span class="transaction-type-icon">${modeEmoji}</span>
+                            <span class="transaction-type-text ${modeClass}">${modeText}</span>
+                        </td>
+                        <td class="transaction-user-cell">${t.nickname}さん</td>
+                        <td class="transaction-content-cell ${contentClass}">${contentText}</td>
+                        <td class="transaction-locker-cell">引き出し${t.locker_id}（${getLockerName(t.locker_id)}）</td>
+                        <td class="transaction-time-cell">${formatDate(t.created_at)}</td>
+                    </tr>
+                `;
+            });
+            
+            tbody.innerHTML = html;
+        }
+
+        /**
+         * 取引を選択
+         */
+        function selectTransaction(transactionId) {
+            window.location.href = `/static/messages.html?transaction_id=${transactionId}`;
+        }
+
+        /**
+         * ロッカー名を取得
+         */
+        function getLockerName(lockerId) {
+            const names = {1: '上段', 2: '中段', 3: '下段'};
+            return names[lockerId] || '';
+        }
+
+        /**
+         * 取引情報とメッセージを読み込む
+         */
+        async function loadTransactionAndMessages() {
+            try {
+                const response = await fetch(`/api/transactions/${transactionId}/messages`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayTransactionInfo(data.transaction);
+                    displayMessages(data.messages);
+                } else {
+                    showError('取引情報の取得に失敗しました');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('通信エラーが発生しました');
+            }
+        }
+
+        /**
+         * 取引情報を表示
+         */
+        function displayTransactionInfo(transaction) {
+            const infoDiv = document.getElementById('transaction-info');
+            
+            const modeText = transaction.mode === 'deposit' ? '預け入れ' : '取り出し';
+            const modeEmoji = transaction.mode === 'deposit' ? '🥦' : '🍲';
+            
+            let html = `
+                <h2>${modeEmoji} ${modeText} - 引き出し${transaction.locker_id}</h2>
+                <p><strong>ユーザー:</strong> ${transaction.nickname}</p>
+                <p><strong>日時:</strong> ${formatDate(transaction.created_at)}</p>
+            `;
+            
+            if (transaction.item) {
+                html += `<p><strong>野菜:</strong> ${transaction.item}</p>`;
+            }
+            
+            if (transaction.duration) {
+                html += `<p><strong>保管期間:</strong> ${transaction.duration}時間</p>`;
+            }
+            
+            infoDiv.innerHTML = html;
+            infoDiv.style.display = 'block';
+        }
+
+        /**
+         * メッセージ一覧を表示
+         */
+        function displayMessages(messages) {
+            const listDiv = document.getElementById('messages-list');
+            const currentUserEmail = document.getElementById('user-email').value;
+
+            if (messages.length === 0) {
+                listDiv.innerHTML = '<div class="no-messages">まだメッセージがありません</div>';
+                return;
+            }
+
+            let html = '';
+            messages.forEach(msg => {
+                const isOwnMessage = currentUserEmail && msg.sender_email === currentUserEmail;
+                const messageClass = isOwnMessage ? 'own-message' : 'other-message';
+                
+                html += `
+                    <div class="message-item ${messageClass}">
+                        <div class="message-sender">${msg.sender_name}</div>
+                        <div class="message-content">${escapeHtml(msg.content)}</div>
+                        <div class="message-time">${formatDate(msg.created_at)}</div>
+                    </div>
+                `;
+            });
+
+            listDiv.innerHTML = html;
+            
+            // 最新メッセージまでスクロール
+            listDiv.scrollTop = listDiv.scrollHeight;
+        }
+
+        /**
+         * メッセージを送信
+         */
+        async function sendMessage() {
+            const email = document.getElementById('user-email').value.trim();
+            const content = document.getElementById('message-content').value.trim();
+
+            if (!email) {
+                showFormMessage('メールアドレスを入力してください', 'error');
+                return;
+            }
+
+            if (!content) {
+                showFormMessage('メッセージを入力してください', 'error');
+                return;
+            }
+
+            // メールアドレスをローカルストレージに保存
+            localStorage.setItem('userEmail', email);
+
+            const sendButton = document.getElementById('send-button');
+            sendButton.disabled = true;
+            sendButton.textContent = '送信中...';
+
+            try {
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        transaction_id: parseInt(transactionId),
+                        from_user_email: email,
+                        content: content
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showFormMessage('メッセージを送信しました！', 'success');
+                    document.getElementById('message-content').value = '';
+                    
+                    // メッセージ一覧を再読み込み
+                    setTimeout(() => {
+                        loadTransactionAndMessages();
+                    }, 500);
+                } else {
+                    showFormMessage(data.message || '送信に失敗しました', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showFormMessage('通信エラーが発生しました', 'error');
+            } finally {
+                sendButton.disabled = false;
+                sendButton.textContent = '送信する';
+            }
+        }
+
+        /**
+         * フォームメッセージを表示
+         */
+        function showFormMessage(message, type) {
+            const messageDiv = document.getElementById('form-message');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = message;
+            messageDiv.style.display = 'block';
+
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        /**
+         * エラーメッセージを表示
+         */
+        function showError(message) {
+            const listDiv = document.getElementById('messages-list');
+            listDiv.innerHTML = `<div class="error-message">${message}</div>`;
+        }
+
+        /**
+         * 日時をフォーマット
+         */
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            
+            // 1分未満
+            if (diff < 60000) {
+                return 'たった今';
+            }
+            // 1時間未満
+            if (diff < 3600000) {
+                const minutes = Math.floor(diff / 60000);
+                return `${minutes}分前`;
+            }
+            // 24時間未満
+            if (diff < 86400000) {
+                const hours = Math.floor(diff / 3600000);
+                return `${hours}時間前`;
+            }
+            
+            // それ以降は日付表示
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const hours = date.getHours();
+            const minutes = date.getMinutes();
+            
+            return `${year}/${month}/${day} ${hours}:${minutes.toString().padStart(2, '0')}`;
+        }
+
+        /**
+         * HTMLエスケープ
+         */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Enterキーでメッセージ送信（Shift+Enterで改行）
+        document.getElementById('message-content').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // 定期的にメッセージを更新（30秒ごと）
+        setInterval(() => {
+            if (transactionId) {
+                loadTransactionAndMessages();
+            }
+        }, 30000);
     </script>
 </body>
-
 </html>

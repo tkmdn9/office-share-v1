@@ -9,10 +9,28 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 # from gpiozero import OutputDevice
 from time import sleep
 import os
+
+# データベース関連のインポート
+from database import init_database, get_db_connection
+from crud import (
+    get_or_create_user, 
+    get_user_by_email,
+    create_transaction, 
+    get_transaction_by_id,
+    get_transactions_by_locker,
+    get_recent_deposits,
+    get_all_transactions,
+    send_message, 
+    get_messages_by_transaction,
+    get_messages_between_users,
+    mark_message_as_read,
+    get_unread_message_count,
+    get_user_statistics
+)
 
 # ロック用リレーをつないだGPIOピン
 LOCK_GPIO_PIN_1 = 22
@@ -125,6 +143,7 @@ class LockersResponse(BaseModel):
 @app.on_event("startup")
 async def startup_event():
     setup_gpio()
+    init_database()  # データベース初期化
     print("🥬 オフィシェアロッカーAPIサーバー起動")
 
 
@@ -258,14 +277,30 @@ async def unlock_locker(locker_id: int):
         )
 
 @app.post("/api/unlock/{locker_id}", response_model=UnlockResponse)
-async def unlock_locker(locker_id: int, body: UnlockRequest):
-    # ここで body.mode / body.nickname / body.email / body.item / body.duration が使える
-    # 例: ログ保存・DB保存など
-    print(f"[{body.mode}] locker={locker_id}, user={body.nickname} <{body.email}>")
-    if body.mode == "deposit":
-        print(f"item={body.item}, duration={body.duration}h")
-
-    # あとは今までの解錠ロジックをそのまま
+async def unlock_locker_with_user_info(locker_id: int, body: UnlockRequest):
+    """
+    ユーザー情報付きロック解除（データベース保存機能付き）
+    """
+    # ユーザー情報をデータベースに保存
+    transaction_id = None
+    if body.nickname and body.email:
+        try:
+            user_id = get_or_create_user(body.nickname, body.email)
+            transaction_id = create_transaction(
+                locker_id=locker_id,
+                mode=body.mode,
+                user_id=user_id,
+                item=body.item,
+                duration=body.duration
+            )
+            print(f"✅ Transaction saved: ID={transaction_id}, User={body.nickname}, Mode={body.mode}")
+            if body.mode == "deposit" and body.item:
+                print(f"   Item: {body.item}, Duration: {body.duration}h")
+        except Exception as e:
+            print(f"⚠️ Database error: {e}")
+            # DB保存に失敗しても解錠処理は続行
+    
+    # 既存の解錠ロジック
     if locker_id not in LOCKERS:
         return UnlockResponse(
             success=False,
@@ -323,6 +358,231 @@ async def auto_lock(locker_id: int):
     
     locker_status[locker_id] = "locked"
     print(f"🔒 Locker {locker_id} ({config['name']}) AUTO-LOCKED - GPIO{gpio_pin} LOW")
+
+
+# ============================================
+# メッセージ機能 - 新規エンドポイント
+# ============================================
+
+class MessageSendRequest(BaseModel):
+    transaction_id: Optional[int] = None
+    from_user_email: str
+    to_user_email: Optional[str] = None
+    content: str
+
+
+class MessageResponse(BaseModel):
+    success: bool
+    message_id: Optional[int] = None
+    message: str
+
+
+@app.post("/api/messages", response_model=MessageResponse)
+async def post_message(body: MessageSendRequest):
+    """
+    メッセージを送信
+    """
+    try:
+        # 送信者のユーザー情報を取得
+        from_user = get_user_by_email(body.from_user_email)
+        if not from_user:
+            raise HTTPException(status_code=404, detail="送信者が見つかりません")
+        
+        # 受信者のユーザー情報を取得（オプション）
+        to_user_id = None
+        if body.to_user_email:
+            to_user = get_user_by_email(body.to_user_email)
+            if to_user:
+                to_user_id = to_user["id"]
+        
+        # メッセージを保存
+        message_id = send_message(
+            from_user_id=from_user["id"],
+            content=body.content,
+            transaction_id=body.transaction_id,
+            to_user_id=to_user_id
+        )
+        
+        print(f"📨 Message sent: ID={message_id}, From={body.from_user_email}")
+        
+        return MessageResponse(
+            success=True,
+            message_id=message_id,
+            message="メッセージを送信しました"
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        return MessageResponse(
+            success=False,
+            message=f"エラー: {str(e)}"
+        )
+
+
+@app.get("/api/transactions/{transaction_id}/messages")
+async def get_transaction_messages(transaction_id: int):
+    """
+    特定の取引に関するメッセージ一覧を取得
+    """
+    try:
+        # 取引情報を確認
+        transaction = get_transaction_by_id(transaction_id)
+        if not transaction:
+            raise HTTPException(status_code=404, detail="取引が見つかりません")
+        
+        # メッセージ一覧を取得
+        messages = get_messages_by_transaction(transaction_id)
+        
+        return {
+            "success": True,
+            "transaction": transaction,
+            "messages": messages,
+            "message_count": len(messages)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lockers/{locker_id}/transactions")
+async def get_locker_transactions(locker_id: int, limit: int = 50):
+    """
+    特定のロッカーの取引履歴を取得
+    """
+    if locker_id not in LOCKERS:
+        raise HTTPException(status_code=404, detail="ロッカーが見つかりません")
+    
+    try:
+        transactions = get_transactions_by_locker(locker_id, limit)
+        
+        return {
+            "success": True,
+            "locker_id": locker_id,
+            "locker_name": LOCKERS[locker_id]["name"],
+            "transactions": transactions,
+            "transaction_count": len(transactions)
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/lockers/{locker_id}/deposits")
+async def get_locker_deposits(locker_id: int, limit: int = 10):
+    """
+    特定のロッカーの最近の預け入れ記録を取得
+    """
+    if locker_id not in LOCKERS:
+        raise HTTPException(status_code=404, detail="ロッカーが見つかりません")
+    
+    try:
+        deposits = get_recent_deposits(locker_id, limit)
+        
+        return {
+            "success": True,
+            "locker_id": locker_id,
+            "locker_name": LOCKERS[locker_id]["name"],
+            "deposits": deposits,
+            "deposit_count": len(deposits)
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/users/{email}/messages")
+async def get_user_messages(email: str, other_user_email: Optional[str] = None):
+    """
+    ユーザーのメッセージ履歴を取得
+    other_user_emailが指定された場合は2人間の履歴のみ
+    """
+    try:
+        user = get_user_by_email(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+        
+        if other_user_email:
+            other_user = get_user_by_email(other_user_email)
+            if not other_user:
+                raise HTTPException(status_code=404, detail="相手ユーザーが見つかりません")
+            
+            messages = get_messages_between_users(user["id"], other_user["id"])
+        else:
+            # 全メッセージを取得（送信・受信両方）
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """SELECT m.*, 
+                              u.nickname as sender_name,
+                              u.email as sender_email
+                       FROM messages m
+                       JOIN users u ON m.from_user_id = u.id
+                       WHERE m.from_user_id = ? OR m.to_user_id = ?
+                       ORDER BY m.created_at DESC
+                       LIMIT 100""",
+                    (user["id"], user["id"])
+                )
+                messages = [dict(row) for row in cursor.fetchall()]
+        
+        return {
+            "success": True,
+            "user": user,
+            "messages": messages,
+            "message_count": len(messages)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/users/{email}/stats")
+async def get_user_stats(email: str):
+    """
+    ユーザーの統計情報を取得
+    """
+    try:
+        user = get_user_by_email(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+        
+        stats = get_user_statistics(user["id"])
+        
+        return {
+            "success": True,
+            "user": {
+                "nickname": user["nickname"],
+                "email": user["email"]
+            },
+            "statistics": stats
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/transactions")
+async def get_transactions(limit: int = 50):
+    """
+    全取引の一覧を取得（最新順）
+    """
+    try:
+        transactions = get_all_transactions(limit)
+        
+        return {
+            "success": True,
+            "transactions": transactions,
+            "transaction_count": len(transactions)
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- メイン実行 ---

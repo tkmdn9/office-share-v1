@@ -13,6 +13,21 @@ rm -rf .venv
 # 外部公開用のURL
 ngrok http 8000
 
+# データベースに接続
+cd backend
+sqlite3 offishare.db
+
+# テーブル一覧を表示
+.tables
+
+# 各テーブルのデータを確認
+SELECT * FROM users;
+SELECT * FROM transactions;
+SELECT * FROM messages;
+
+# DBから出る
+.exit
+
 # QRコード生成(GET用)
 qrencode -o locker1.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/?locker=1"
 qrencode -o locker2.png -s 10 "https://arianne-flossy-supereloquently.ngrok-free.dev/?locker=2"

@@ -1,11 +1,18 @@
-# 野菜シェアロッカー システム仕様書
+# オフィシェアロッカー システム仕様書
 
 ## 1. システム概要
 
 ### 1.1 目的
 会社内で採れすぎた野菜を同僚と簡単にシェアできる冷蔵庫型ロッカーシステム
 
-### 1.2 システム構成図
+### 1.2 主な機能
+- QRコード読み取りによるロッカー選択
+- ユーザー情報入力（ニックネーム、メールアドレス）
+- 野菜情報入力（「入れる」モード時のみ）
+- 自動解錠・施錠（2秒間）
+- ngrok経由での外部公開
+
+### 1.3 システム構成図
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -192,14 +199,60 @@ Raspberry Pi 4                    3chリレーモジュール
 
 | メソッド | エンドポイント | 説明 |
 |----------|---------------|------|
-| GET | `/` | ヘルスチェック |
+| GET | `/` | Web UI表示 |
 | GET | `/api/lockers` | 全ロッカー状態取得 |
 | GET | `/api/lockers/{id}` | 個別ロッカー状態取得 |
-| GET | `/api/unlock/{id}` | ロック解除 |
+| GET | `/api/unlock/{id}` | ロック解除（シンプル） |
+| POST | `/api/unlock/{id}` | ロック解除（ユーザー情報付き） |
 
 ### 5.2 API詳細
 
-#### GET `/api/unlock/{id}` - ロック解除
+#### POST `/api/unlock/{id}` - ユーザー情報付きロック解除（推奨）
+
+**リクエスト**
+```json
+POST /api/unlock/1
+Content-Type: application/json
+
+{
+  "mode": "deposit",
+  "nickname": "やさい太郎",
+  "email": "yasai@example.com",
+  "item": "キャベツ 2個",
+  "duration": 3
+}
+```
+
+**パラメータ**
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|-----|------|------|
+| id | int | ○ | ロッカーID (1-3) |
+| mode | string | ○ | 'deposit' または 'retrieve' |
+| nickname | string | △ | ユーザーのニックネーム |
+| email | string | △ | ユーザーのメールアドレス |
+| item | string | △ | 預ける野菜の名前（depositモード時） |
+| duration | int | △ | 保管期間（時間単位、depositモード時） |
+
+**レスポンス (成功)**
+```json
+{
+  "success": true,
+  "locker_id": 1,
+  "message": "引き出し1（上段）を解錠しました",
+  "unlock_duration": 2
+}
+```
+
+**レスポンス (エラー)**
+```json
+{
+  "success": false,
+  "locker_id": 1,
+  "message": "Error: ..."
+}
+```
+
+#### GET `/api/unlock/{id}` - シンプルなロック解除
 
 **リクエスト**
 ```
@@ -221,24 +274,15 @@ GET /api/unlock/1
 }
 ```
 
-**レスポンス (エラー)**
-```json
-{
-  "success": false,
-  "error": "Invalid locker ID",
-  "valid_ids": [1, 2, 3]
-}
-```
-
 #### GET `/api/lockers` - 全ロッカー状態取得
 
 **レスポンス**
 ```json
 {
   "lockers": [
-    {"id": 1, "name": "上段", "gpio": 17, "status": "locked"},
+    {"id": 1, "name": "上段", "gpio": 22, "status": "locked"},
     {"id": 2, "name": "中段", "gpio": 27, "status": "locked"},
-    {"id": 3, "name": "下段", "gpio": 22, "status": "unlocked"}
+    {"id": 3, "name": "下段", "gpio": 17, "status": "unlocked"}
   ]
 }
 ```
@@ -251,36 +295,79 @@ GET /api/unlock/1
 
 各引き出しに貼付するQRコードには以下のURLを埋め込む:
 
+**ローカルネットワーク使用時**
 | 引き出し | QRコード内容 |
 |---------|-------------|
 | 上段 | `http://{RASPI_IP}:8000/?locker=1` |
 | 中段 | `http://{RASPI_IP}:8000/?locker=2` |
 | 下段 | `http://{RASPI_IP}:8000/?locker=3` |
 
+**ngrok使用時（外部公開）**
+| 引き出し | QRコード内容 |
+|---------|-------------|
+| 上段 | `https://{NGROK_URL}/?locker=1` |
+| 中段 | `https://{NGROK_URL}/?locker=2` |
+| 下段 | `https://{NGROK_URL}/?locker=3` |
+
 ### 6.2 QRコード生成例
 
 ```bash
-# qrencodeを使用
-qrencode -o locker1.png "http://192.168.1.100:8000/?locker=1"
-qrencode -o locker2.png "http://192.168.1.100:8000/?locker=2"
-qrencode -o locker3.png "http://192.168.1.100:8000/?locker=3"
+# qrencodeをインストール (macOS)
+brew install qrencode
+
+# ローカルネットワーク用
+qrencode -o locker1.png -s 20 "http://192.168.1.100:8000/?locker=1"
+qrencode -o locker2.png -s 20 "http://192.168.1.100:8000/?locker=2"
+qrencode -o locker3.png -s 20 "http://192.168.1.100:8000/?locker=3"
+
+# ngrok用（推奨）
+qrencode -o locker1.png -s 20 "https://your-ngrok-url.ngrok-free.dev/?locker=1"
+qrencode -o locker2.png -s 20 "https://your-ngrok-url.ngrok-free.dev/?locker=2"
+qrencode -o locker3.png -s 20 "https://your-ngrok-url.ngrok-free.dev/?locker=3"
+```
+
+> **注意**: `-s 20` でサイズを大きくすることで、QRコードが読み取りやすくなります。URLが長い場合は `-s 20` 以上を推奨します。
+
+### 6.3 ユーザーフロー
+
+```
+1. QRコード読み取り
+   ↓
+2. Web UIが開く（/?locker=1）
+   ↓
+3. モード選択（「野菜を入れる」or「野菜を取り出す」）
+   ↓
+4. 入力フォームが表示される
+   ├─ ニックネーム
+   ├─ メールアドレス
+   └─ [入れるモードのみ]
+      ├─ 何を入れますか？
+      └─ 保管期間
+   ↓
+5. 「解錠する」ボタンをタップ
+   ↓
+6. POSTリクエスト送信（/api/unlock/{id}）
+   ↓
+7. 2秒間解錠 → 自動施錠
 ```
 
 ---
 
 ## 7. セキュリティ考慮事項
 
-### 7.1 現在の実装（最小構成）
+### 7.1 現在の実装
 
-- 社内WiFi内での使用を前提
-- 認証なし（シンプルなGETリクエスト）
+- ngrok経由での外部公開（HTTPS自動適用）
+- 認証なし（シンプルなPOSTリクエスト）
+- ユーザー情報はコンソールログに出力のみ（DB保存なし）
 
 ### 7.2 将来の拡張案
 
 - APIキー認証の追加
 - ユーザー認証（社員ID連携）
-- 利用ログの記録
-- 通知機能（野菜の登録/取得時）
+- 利用ログのDB保存（SQLite、PostgreSQLなど）
+- 通知機能（野菜の登録/取得時にメール送信）
+- 野菜の在庫管理機能
 
 ---
 
@@ -291,11 +378,38 @@ qrencode -o locker3.png "http://192.168.1.100:8000/?locker=3"
 - OS: Raspberry Pi OS (Bookworm以降推奨)
 - Python: 3.9以上
 - 必要パッケージ:
-  - fastapi
-  - uvicorn
-  - RPi.GPIO (または gpiozero)
+  - fastapi >= 0.104.0
+  - uvicorn[standard] >= 0.24.0
+  - pydantic >= 2.0.0
+  - RPi.GPIO == 0.7.1
+  - gpiozero == 2.0.1
 
 ### 8.2 クライアント側
 
 - モダンブラウザ (Chrome, Safari, Firefox)
 - カメラ付きスマートフォン推奨
+- QRコードリーダー（ブラウザ内蔵またはアプリ）
+
+### 8.3 外部公開ツール
+
+- ngrok (無料プランで利用可能)
+  - インストール: `brew install ngrok` (macOS)
+  - 実行: `ngrok http 8000`
+
+---
+
+## 9. 変更履歴
+
+### v1.1 (2026-01-29)
+- QRコード読み取り後、ユーザー情報入力フォームを表示する仕様に変更
+- POSTエンドポイント `/api/unlock/{id}` を追加（ユーザー情報付きロック解除）
+- 手動ロック解除ボタンを非表示化（QRコード専用運用）
+- ngrok対応（外部公開機能）
+- QRコード生成時のサイズ推奨値を追加（`-s 20`）
+- GPIO制御に `gpiozero` の `OutputDevice` を使用
+
+### v1.0 (2026-01-25)
+- 初回リリース
+- 基本的なロック解除機能
+- Web UI実装
+- GET `/api/unlock/{id}` エンドポイント
